@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Two-Click Translator</title>
+
+<!-- Load Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'bg': '#0b0b0b',
+          'card': '#111214',
+          'panel': '#161617',
+          'muted': '#bfc4c8',
+        },
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        },
+      }
+    }
+  }
+</script>
+
+<style>
+  :root{
+    --btn-h: 64px;
+    --lang-ring: 4px;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  .wrap{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:28px;}
+  .app{width:100%;max-width:420px;}
+  .card{background:linear-gradient(180deg,#0f1112, #0b0b0b);border-radius:14px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03);}
+  .output{
+    /* Added position: relative to contain the icon */
+    position: relative; 
+    height:84px;border-radius:10px;background:linear-gradient(180deg,#070708,#0b0b0b);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;
+    border:1px solid rgba(255,255,255,0.04);margin-bottom:14px; user-select:none;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .output:active {
+    background: linear-gradient(180deg,#0a0a0b,#0e0e0f);
+  }
+  
+  /* New styles for the audio indicator icon */
+  .audio-indicator {
+      position: absolute;
+      top: 10px; /* Position above and to the right */
+      right: 14px; 
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.4); 
+  }
+  
+  /* Span containing the main visible text */
+  #outputText {
+      transition: font-size 0.2s ease;
+  }
+
+  .lang-row{display:flex;gap:8px;margin-bottom:12px;}
+  .lang-btn{flex:1;height:56px;border-radius:10px;border:none;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:0; position:relative;}
+  .lang-btn:active{transform:translateY(1px)}
+  .lang-btn .label{pointer-events:none; text-shadow: 0 1px 2px rgba(0,0,0,0.2);}
+  .lang-btn.unselect{opacity:0.85}
+  .lang-selected{
+    box-shadow:0 6px 30px rgba(100,150,255,0.18);
+    outline: none;
+    border-radius:10px;
+    position:relative;
+    z-index:1;
+  }
+  .lang-selected::after{
+    content:"";position:absolute;inset: -6px;border-radius:14px;opacity:0.7;pointer-events:none;
+    box-shadow:0 0 30px currentColor; /* Uses the button's text color for the glow */
+  }
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .phrase-btn{height:var(--btn-h);background:#1e1e1e;color:#ffffff;border-radius:10px;border:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer;white-space:pre-wrap;padding:6px;text-align:center; transition: all 0.05s;}
+  .phrase-btn:active{transform:translateY(1px); box-shadow: 0 2px 4px rgba(0,0,0,0.5);}
+  .small-muted{font-size:12px;color:#9da3a7;margin-top:8px;text-align:center}
+  
+  /* Modal Styles */
+  .modal-bg{position:fixed;inset:0;background:linear-gradient(rgba(3,3,3,0.8),rgba(3,3,3,0.8));display:flex;align-items:center;justify-content:center;z-index:40}
+  .modal{background:#111214;padding:18px;border-radius:12px;width:90%;max-width:360px;border:1px solid rgba(255,255,255,0.04); box-shadow:0 10px 40px rgba(0,0,0,0.7);}
+  .modal h3{margin:0 0 12px 0;color:#fff;font-size:17px;font-weight:700;}
+  .modal-input {
+      width: 100%; padding: 12px; margin: 10px 0 16px; border-radius: 8px; 
+      background: #0d0d0f; border: 1px solid rgba(255,255,255,0.1); 
+      color: #fff; font-size: 16px; box-sizing: border-box;
+      outline: none;
+  }
+  .modal-input:focus {
+      border-color: #60a5fa;
+  }
+  .action-btn {
+      width: 49%; padding: 12px; border-radius: 10px; font-weight: 700;
+      transition: background 0.15s;
+  }
+  .action-confirm {
+      background: #4ade80; color: #111; border: none;
+  }
+  .action-confirm:active {
+      background: #22c55e;
+  }
+  .action-cancel {
+      background: #333; color: #fff; border: none; width: 100%;
+  }
+  .action-cancel:active {
+      background: #555;
+  }
+
+  @media (max-width:420px){
+    :root{--btn-h:56px}
+    .output{height:72px;font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="app card" role="application" aria-label="Translation Calculator">
+    <div id="output" class="output" aria-live="polite">
+        <!-- The main text content that remains visible -->
+        <span id="outputText">Hello</span>
+        
+        <!-- The audio indicator icon/spinner -->
+        <div id="audioIndicator" class="audio-indicator" style="display:none;" aria-hidden="true">
+            <!-- Audio Playing Icon (Speaker with waves) -->
+            <svg id="audioIcon" class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="display:none;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.899a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l.207-.207A2 2 0 017.414 7H10a2 2 0 012 2v6a2 2 0 01-2 2H7.414a2 2 0 01-1.414.586L5.586 17z"></path></svg>
+            <!-- Loading Spinner -->
+            <svg id="loadingSpinner" class="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="display:none;">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <!-- Error Icon -->
+            <svg id="errorIcon" class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="display:none;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+    </div>
+
+    <div id="langRow" class="lang-row" aria-hidden="false"></div>
+
+    <div id="phrases" class="grid"></div>
+
+    <div id="helpText" class="small-muted"></div>
+  </div>
+</div>
+
+<!-- modal -->
+<div id="modalRoot" style="display:none;"></div>
+
+<script>
+(() => {
+  
+  // language metadata
+  const LANGS = [
+    {code:'en', native:'English', color:'#4ade80'},
+    {code:'es', native:'Español', color:'#f87171'},
+    {code:'fr', native:'Français', color:'#60a5fa'},
+    {code:'it', native:'Italiano', color:'#fbbf24'},
+    {code:'zh', native:'中文', color:'#a78bfa'},
+    {code:'ru', native:'Русский', color:'#f472b6'},
+    {code:'ar', native:'العربية', color:'#f97316'},
+    {code:'pt', native:'Português', color:'#14b8a6'},
+    {code:'hi', native:'हिन्दी', color:'#eab308'},
+    {code:'ja', native:'日本語', color:'#f43f5e'},
+  ];
+  
+  // Map our simple language codes to BCP-47 codes and preferred voice names for the TTS API
+  const VOICE_MAP = {
+    en: { code:'en-US', voice:'Zephyr' }, es: { code:'es-US', voice:'Puck' }, fr: { code:'fr-FR', voice:'Charon' }, 
+    it: { code:'it-IT', voice:'Kore' }, zh: { code:'zh-CN', voice:'Fenrir' }, ru: { code:'ru-RU', voice:'Leda' }, 
+    ar: { code:'ar-EG', voice:'Orus' }, pt: { code:'pt-BR', voice:'Aoede' }, hi: { code:'hi-IN', voice:'Callirrhoe' }, 
+    ja: { code:'ja-JP', voice:'Autonoe' },
+  };
+
+  // display names for the languages in different display languages
+  const languages_display_names = {
+    en: { en:'English', es:'Spanish', fr:'French', it:'Italian', zh:'Chinese', ru:'Russian', ar:'Arabic', pt:'Portuguese', hi:'Hindi', ja:'Japanese' },
+    es: { en:'Inglés', es:'Español', fr:'Francés', it:'Italiano', zh:'Chino', ru:'Ruso', ar:'Árabe', pt:'Portugués', hi:'Hindi', ja:'Japonés' },
+    fr: { en:'Anglais', es:'Espagnol', fr:'Français', it:'Italien', zh:'Chinois', ru:'Russe', ar:'Arabe', pt:'Portugais', hi:'Hindi', ja:'Japonés' },
+    it: { en:'Inglese', es:'Spagnolo', fr:'Francese', it:'Italiano', zh:'Cinese', ru:'Russo', ar:'Arabo', pt:'Portoghese', hi:'Giapponese', ja:'Giapponese' },
+    zh: { en:'英语', es:'西班牙语', fr:'法语', it:'意大利语', zh:'中文', ru:'俄语', ar:'阿拉伯语', pt:'葡萄牙语', hi:'印地语', ja:'日语' },
+    ru: { en:'Англ.', es:'Испан.', fr:'Франц.', it:'Итальян.', zh:'Кит.', ru:'Русский', ar:'Араб.', pt:'Португ.', hi:'Хинди', ja:'Япон.' },
+    ar: { en:'الإنجليزية', es:'الإسبانية', fr:'الفرنسية', it:'الإيطالية', zh:'الصينية', ru:'الروسية', ar:'العربية', pt:'البرتغالية', hi:'الهندية', ja:'اليابانية' },
+    pt: { en:'Inglês', es:'Espanhol', fr:'Francês', it:'Italiano', zh:'Chinês', ru:'Russo', ar:'Árabe', pt:'Português', hi:'Hindi', ja:'Japonés' },
+    hi: { en:'अंग्रेज़ी', es:'स्पेनिश', fr:'फ्रेंच', it:'इटालियन', zh:'चीनी', ru:'रूसी', ar:'अरबी', pt:'पुर्तगाली', hi:'हिन्दी', ja:'जापानी' },
+    ja: { en:'英語', es:'スペイン語', fr:'フランス語', it:'イタリア語', zh:'中国語', ru:'ロシア語', ar:'アラビア語', pt:'ポルトガル語', hi:'日本語', ja:'日本語' },
+  };
+
+  // Localization strings for the UI based on displayLang
+  const UI_STRINGS = {
+    en: { 
+        help_text: "Tap a phrase to select, **double-click/press-and-hold (800ms) a phrase to type a new custom phrase**. Tap the output to hear the audio.", 
+        custom_input_title: "Type New Phrase (Source: {lang_native})", 
+        custom_input_label: "New Phrase in {lang_native}:", 
+        confirm: "Confirm", 
+        cancel: "Cancel", 
+        translating: "Translating All...", 
+        back_translating: "Translating to English source...",
+        replace_button_title: "Replace {language} button with...",
+        loading_audio: "Loading Audio...",
+        audio_error: "Audio Error: Failed to generate sound.",
+        api_error: "API Error. Please try again.",
+        temp_loading: "Loading...", // Used for text area when processing non-audio translations
+        temp_error: "Error!",
+    },
+    es: { 
+        help_text: "Toca una frase para seleccionar, **doble clic/mantener presionado (800ms) para escribir una nueva frase personalizada**. Toca la salida para escuchar el audio.", 
+        custom_input_title: "Escribir Nueva Frase (Fuente: {lang_native})", 
+        custom_input_label: "Nueva Frase en {lang_native}:", 
+        confirm: "Confirmar", 
+        cancel: "Cancelar", 
+        translating: "Traduciendo todo...", 
+        back_translating: "Traduciendo al inglés para el sistema...",
+        replace_button_title: "Reemplazar el botón de {language} por...",
+        loading_audio: "Cargando Audio...",
+        audio_error: "Error de audio: Falló la generación del sonido.",
+        api_error: "Error de API. Inténtalo de nuevo.",
+        temp_loading: "Cargando...",
+        temp_error: "¡Error!",
+    },
+    fr: { 
+        help_text: "Appuyez sur une phrase pour sélectionner, **double-cliquez/appuyez et maintenez (800ms) pour taper une nouvelle phrase personnalisée**. Appuyez sur la sortie pour écouter l'audio.", 
+        custom_input_title: "Saisir une Nouvelle Phrase (Source: {lang_native})", 
+        custom_input_label: "Nouvelle Phrase {lang_native}:", 
+        confirm: "Confirmer", 
+        cancel: "Annuler", 
+        translating: "Traduction en cours...", 
+        back_translating: "Traduction en anglais pour le système...",
+        replace_button_title: "Remplacer le bouton {language} par...",
+        loading_audio: "Chargement Audio...",
+        audio_error: "Erreur audio : Échec de la génération du son.",
+        api_error: "Erreur API. Veuillez réessayer.",
+        temp_loading: "Chargement...",
+        temp_error: "Erreur!",
+    },
+    it: { 
+        help_text: "Tocca una frase per selezionare, **doppio clic/tieni premuto (800ms) per digitare una nuova frase personalizzata**. Tocca l'output per ascoltare l'audio.", 
+        custom_input_title: "Digita Nuova Frase (Fonte: {lang_native})", 
+        custom_input_label: "Nuova Frase in {lang_native}:", 
+        confirm: "Conferma", 
+        cancel: "Annulla", 
+        translating: "Traduzione in corso...", 
+        back_translating: "Traduzione in inglese per il sistema...",
+        replace_button_title: "Sostituisci il pulsante {language} con...",
+        loading_audio: "Caricamento Audio...",
+        audio_error: "Errore audio: Generazione del suono fallita.",
+        api_error: "Errore API. Riprova per favore.",
+        temp_loading: "Caricamento...",
+        temp_error: "Errore!",
+    },
+    zh: { 
+        help_text: "点击一个短语进行选择，**双击/按住 (800ms) 以输入新的自定义短语**。点击输出区域播放音频。", 
+        custom_input_title: "输入新短语（源: {lang_native}）", 
+        custom_input_label: "新短语（{lang_native}）:", 
+        confirm: "确认", 
+        cancel: "取消", 
+        translating: "正在翻译全部...", 
+        back_translating: "翻译成英文源语言...",
+        replace_button_title: "替换 {language} 按钮为...",
+        loading_audio: "正在加载音频...",
+        audio_error: "音频错误: 声音生成失败。",
+        api_error: "API 错误。请重试。",
+        temp_loading: "加载中...",
+        temp_error: "错误!",
+    },
+    ru: { 
+        help_text: "Нажмите на фразу, чтобы выбрать, **двойной клик/удерживайте (800ms) для ввода новой фразы**. Нажмите на вывод, чтобы прослушать аудио.", 
+        custom_input_title: "Введите новую фразу (источник: {lang_native})", 
+        custom_input_label: "Новая фраза на {lang_native}:", 
+        confirm: "Подтвердить", 
+        cancel: "Отмена", 
+        translating: "Перевод всех...", 
+        back_translating: "Перевод на английский язык для системы...",
+        replace_button_title: "Заменить кнопку {language} на...",
+        loading_audio: "Загрузка аудио...",
+        audio_error: "Ошибка аудио: Не удалось сгенерировать звук.",
+        api_error: "Ошибка API. Повторите попытку.",
+        temp_loading: "Загрузка...",
+        temp_error: "Ошибка!",
+    },
+    ar: { 
+        help_text: "انقر على عبارة للاختيار، **انقر نقرًا مزدوجًا/اضغط مع الاستمرار (800ms) لكتابة عبارة مخصصة جديدة**. انقر على الإخراج لسماع الصوت.", 
+        custom_input_title: "اكتب عبارة جديدة (المصدر: {lang_native})", 
+        custom_input_label: "العبارة الجديدة ({lang_native}):", 
+        confirm: "تأكيد", 
+        cancel: "إلغاء", 
+        translating: "جاري ترجمة الكل...", 
+        back_translating: "الترجمة إلى الإنجليزية للمصدر...",
+        replace_button_title: "استبدال زر {language} بـ...",
+        loading_audio: "جاري تحميل الصوت...",
+        audio_error: "خطأ في الصوت: فشل في توليد الصوت.",
+        api_error: "خطأ في API. يرجى المحاولة مرة أخرى.",
+        temp_loading: "جاري التحميل...",
+        temp_error: "خطأ!",
+    },
+    pt: { 
+        help_text: "Toque em uma frase para selecionar, **clique duas vezes/pressione e segure (800ms) para digitar uma nova frase personalizada**. Toque na saída para ouvir o áudio.", 
+        custom_input_title: "Digite Nova Frase (Fonte: {lang_native})", 
+        custom_input_label: "Nova Frase em {lang_native}:", 
+        confirm: "Confirmar", 
+        cancel: "Cancelar", 
+        translating: "Traduzindo tudo...", 
+        back_translating: "Traduzindo para a fonte em inglês...",
+        replace_button_title: "Substituir o botão {language} por...",
+        loading_audio: "Carregando Áudio...",
+        audio_error: "Erro de áudio: Falha ao gerar o som.",
+        api_error: "Erro de API. Por favor, tente novamente.",
+        temp_loading: "Carregando...",
+        temp_error: "Erro!",
+    },
+    hi: { 
+        help_text: "चुनने के लिए एक वाक्यांश पर टैप करें, **एक नया कस्टम वाक्यांश टाइप करने के लिए डबल-क्लिक/प्रेस-होल्ड (800ms) करें**। ऑडियो सुनने के लिए आउटपुट पर टैप करें।", 
+        custom_input_title: "नया वाक्यांश टाइप करें (स्रोत: {lang_native})", 
+        custom_input_label: "नया वाक्यांश ({lang_native}):", 
+        confirm: "पुष्टि करें", 
+        cancel: "रद्द करें", 
+        translating: "सभी का अनुवाद हो रहा है...", 
+        back_translating: "अंग्रेजी स्रोत में अनुवाद हो रहा है...",
+        replace_button_title: "{language} बटन को इससे बदलें...",
+        loading_audio: "ऑडियो लोड हो रहा है...",
+        audio_error: "ऑडियो त्रुटि: ध्वनि उत्पन्न करने में विफल।",
+        api_error: "API त्रुटि। कृपया पुनः प्रयास करें।",
+        temp_loading: "लोड हो रहा है...",
+        temp_error: "त्रुटि!",
+    },
+    ja: { 
+        help_text: "フレーズをタップして選択し、**新しいカスタムフレーズを入力するためにダブルクリック/長押し (800ms)**します。音声を聞くには出力エリアをタップします。", 
+        custom_input_title: "新しいフレーズを入力（ソース: {lang_native}）", 
+        custom_input_label: "新しいフレーズ（{lang_native}）:", 
+        confirm: "確認", 
+        cancel: "キャンセル", 
+        translating: "すべて翻訳中...", 
+        back_translating: "英語ソースに翻訳中...",
+        replace_button_title: "Replace {language} button with...",
+        loading_audio: "音声ロード中...",
+        audio_error: "音声エラー: 音声生成に失敗しました。",
+        api_error: "APIエラー。もう一度お試しください。",
+        temp_loading: "ロード中...",
+        temp_error: "エラー!",
+    }
+  };
+
+
+  // --- Combined Initial Phrase Data ---
+  // We only use the first 16 phrases as the active set.
+  const INITIAL_ACTIVE_PHRASES_DATA = {
+    en: [
+        "Hello","How are you?","Good","Bad","Yes","No","Thank you","Please","Sorry","Excuse me","Good morning","Good night","I love you","Help","Stop","Go"
+    ],
+    es: [
+        "Hola","¿Cómo estás?","Bien","Mal","Sí","No","Gracias","Por favor","Lo siento","Perdón","Buenos días","Buenas noches","Te quiero","Ayuda","Alto","Vamos"
+    ],
+    fr: [
+        "Bonjour","Comment ça va?","Bien","Mal","Oui","Non","Merci","S'il vous plaît","Pardon","Excusez-moi","Bonjour (matin)","Bonne nuit","Je t'aime","Aidez-moi","Stop","Allons"
+    ],
+    it: [
+        "Ciao","Come stai?","Bene","Mal","Sì","No","Grazie","Per favore","Mi dispiace","Scusa","Buongiorno","Buonanotte","Ti amo","Aiuto","Fermati","Andiamo"
+    ],
+    zh: [
+        "你好","你好吗？","好","坏","是","不","谢谢","请","对不起","劳驾","早上好","晚安","我爱你","帮助","停","走"
+    ],
+    ru: [
+        "Привет","Как дела?","Хорошо","Плохо","Да","Нет","Спасибо","Пожалуйста","Извини","Простите","Доброе утро","Спокойной ночи","Я тебя люблю","Помогите","Стоп","Идём"
+    ],
+    ar: [
+        "مرحبا","كيف حالك؟","جيد","سيئ","نعم","لا","شكرا","من فضلك","آسف","عفوا","صباح الخير","تصبح على خير","أحبك","ساعدني","قف","هيا"
+    ],
+    pt: [
+        "Olá","Como você está?","Bom","Ruim","Sim","Não","Obrigado","Por favor","Desculpe","Com licença","Bom dia","Boa noite","Eu te amo","Ajuda","Pare","Vamos"
+    ],
+    hi: [
+        "नमस्ते","कैसे हैं?","अच्छा","बुरा","हाँ","नहीं","धन्यवाद","कृपया","माफ़ करें","सॉरी","सुप्रभात","शुभ रात्रि","मैं तुमसे प्यार करता हूँ","मदद","रुको","चलो"
+    ],
+    ja: [
+        "こんにちは","お元気ですか？","良い","悪い","はい","いいえ","ありがとう","お願いします","ごめんなさい","失礼します","おはよう","おやすみ","愛してる","助けて","止まれ","行こう"
+    ]
+  };
+
+  // PHRASES_BANK will hold the dynamic state: {en: [...], es: [...], ...} (just the active array)
+  let PHRASES_BANK = {}; 
+
+  // Function to initialize or reset a single language's bank
+  function initializePhraseBank(code) {
+      PHRASES_BANK[code] = INITIAL_ACTIVE_PHRASES_DATA[code]; 
+  }
+
+  // Load from storage or initialize all languages on first run
+  const storedBank = localStorage.getItem('PHRASES_BANK');
+  if (storedBank) {
+      PHRASES_BANK = JSON.parse(storedBank);
+      // Ensure all languages are initialized in case a new language was added since last save
+      LANGS.forEach(l => {
+          if (!PHRASES_BANK[l.code]) {
+              initializePhraseBank(l.code);
+          }
+      });
+  } else {
+      // First run: use initial hardcoded translations to populate the bank
+      LANGS.forEach(l => initializePhraseBank(l.code));
+  }
+
+
+  // initial state
+  let displayLang = localStorage.getItem('displayLang') || 'en';      // what the UI shows (Input Language)
+  let outputLang = localStorage.getItem('outputLang') || 'en';       // which language the translation uses (Output Language)
+  let topRow = JSON.parse(localStorage.getItem('topRow')) || ['en','es','fr','it']; // first-row languages; index 0 fixed to 'en'
+  let lastPhraseIndex = 0;
+  let isSpeaking = false; // Flag to prevent multiple simultaneous TTS requests
+
+  const elOutput = document.getElementById('output');
+  const elOutputText = document.getElementById('outputText'); // NEW: Span holding the main text
+  const elLangRow = document.getElementById('langRow');
+  const elPhrases = document.getElementById('phrases');
+  const elHelpText = document.getElementById('helpText'); 
+  const modalRoot = document.getElementById('modalRoot');
+
+  // NEW: Audio Indicator elements
+  const elAudioIndicator = document.getElementById('audioIndicator');
+  const elLoadingSpinner = document.getElementById('loadingSpinner');
+  const elAudioIcon = document.getElementById('audioIcon');
+  const elErrorIcon = document.getElementById('errorIcon');
+
+  // Persistence Helper
+  function saveState() {
+    localStorage.setItem('displayLang', displayLang);
+    localStorage.setItem('outputLang', outputLang);
+    localStorage.setItem('topRow', JSON.stringify(topRow));
+    localStorage.setItem('PHRASES_BANK', JSON.stringify(PHRASES_BANK)); // Save the dynamic bank
+  }
+
+  // helpers
+  function langMeta(code){ return LANGS.find(l=>l.code===code) || {code,label:code,color:'#666'}; }
+  
+  // hex to rgba small helper
+  function hexToRgba(hex,alpha=1){
+    const h = hex.replace('#','');
+    const bigint = parseInt(h,16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  // Generic fetch with exponential backoff for API calls
+  async function exponentialBackoffFetch(url, options, maxRetries = 5) {
+      for (let i = 0; i < maxRetries; i++) {
+          try {
+              const response = await fetch(url, options);
+              if (response.ok) return response;
+              
+              if (response.status >= 500 || response.status === 429) {
+                  throw new Error(`Server error or rate limit: ${response.status}`);
+              } else {
+                  return response;
+              }
+          } catch (error) {
+              if (i === maxRetries - 1) throw error;
+              const delay = Math.pow(2, i) * 1000;
+              await new Promise(resolve => setTimeout(resolve, delay));
+          }
+      }
+  }
+
+  // Helper to convert Base64 string to ArrayBuffer and then to WAV Blob (TTS)
+  function base64ToArrayBuffer(base64) {
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+  }
+
+  function pcmToWav(pcm16, sampleRate = 24000) {
+      const numChannels = 1;
+      const bitDepth = 16;
+      const blockAlign = numChannels * (bitDepth / 8);
+      const byteRate = sampleRate * blockAlign;
+
+      const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+      const view = new DataView(buffer);
+      let offset = 0;
+
+      function writeString(s) {
+          for (let i = 0; i < s.length; i++) {
+              view.setUint8(offset++, s.charCodeAt(i));
+          }
+      }
+      function writeUint32(i) { view.setUint32(offset, i, true); offset += 4; }
+      function writeUint16(i) { view.setUint16(offset, i, true); offset += 2; }
+
+      writeString('RIFF');
+      writeUint32(36 + pcm16.length * 2); 
+      writeString('WAVE'); 
+      writeString('fmt '); 
+      writeUint32(16);
+      writeUint16(1);
+      writeUint16(numChannels);
+      writeUint32(sampleRate);
+      writeUint32(byteRate);
+      writeUint16(blockAlign);
+      writeUint16(bitDepth);
+      writeString('data'); 
+      writeUint32(pcm16.length * 2); 
+
+      for (let i = 0; i < pcm16.length; i++) {
+          view.setInt16(offset, pcm16[i], true);
+          offset += 2;
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+  }
+
+  // Get the active phrase array for a given language code. Defaults to English active phrases.
+  function getActivePhrases(code) {
+      return PHRASES_BANK[code] || PHRASES_BANK['en'];
+  }
+
+  let currentOutputText = getActivePhrases(outputLang)[lastPhraseIndex] || getActivePhrases('en')[0];
+  
+  function updateOutput(text, isTemp = false){
+    // Only update currentOutputText if it's not a temporary message (like "Translating...")
+    if (!isTemp) {
+        currentOutputText = text;
+    }
+    // Update the span element containing the text
+    elOutputText.innerText = text; 
+    
+    // Reset font size if text is not a temporary message
+    if (!isTemp) {
+        elOutputText.style.fontSize = '20px';
+    }
+  }
+
+  // NEW: Function to manage the visual state of the audio indicator
+  function setAudioIndicatorState(state) {
+      // Clear all
+      elAudioIndicator.style.display = 'none';
+      elLoadingSpinner.style.display = 'none';
+      elAudioIcon.style.display = 'none';
+      elErrorIcon.style.display = 'none';
+
+      if (state === 'loading') {
+          elAudioIndicator.style.display = 'flex';
+          elLoadingSpinner.style.display = 'block';
+      } else if (state === 'playing') {
+          elAudioIndicator.style.display = 'flex';
+          elAudioIcon.style.display = 'block';
+      } else if (state === 'error') {
+          elAudioIndicator.style.display = 'flex';
+          elErrorIcon.style.display = 'block';
+      }
+  }
+  
+  async function speakText(text, langCode) {
+      if (isSpeaking) {
+          console.warn("Speech generation already in progress.");
+          return;
+      }
+      
+      isSpeaking = true;
+      
+      setAudioIndicatorState('loading'); // Show loading spinner
+      
+      const voiceData = VOICE_MAP[langCode] || VOICE_MAP['en'];
+      const apiKey = ""; 
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+      const payload = {
+          contents: [{ parts: [{ text: text }] }],
+          generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                  voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: voiceData.voice }
+                  }
+              },
+          },
+          model: "gemini-2.5-flash-preview-tts"
+      };
+
+      try {
+          const response = await exponentialBackoffFetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+          });
+
+          const result = await response.json();
+          const part = result?.candidates?.[0]?.content?.parts?.[0];
+          const audioData = part?.inlineData?.data;
+          const mimeType = part?.inlineData?.mimeType;
+
+          if (audioData && mimeType && mimeType.startsWith("audio/")) {
+              const match = mimeType.match(/rate=(\d+)/);
+              const sampleRate = match ? parseInt(match[1], 10) : 24000;
+              
+              const pcmData = base64ToArrayBuffer(audioData);
+              const pcm16 = new Int16Array(pcmData);
+              const wavBlob = pcmToWav(pcm16, sampleRate);
+              const audioUrl = URL.createObjectURL(wavBlob);
+              
+              setAudioIndicatorState('playing'); // Switch to sound icon
+              const audio = new Audio(audioUrl);
+              audio.play();
+
+              audio.onended = () => {
+                  URL.revokeObjectURL(audioUrl);
+                  isSpeaking = false;
+                  setAudioIndicatorState('idle'); // Hide icon
+              };
+
+          } else {
+              setAudioIndicatorState('error'); // Show error icon
+              setTimeout(() => { 
+                isSpeaking = false;
+                setAudioIndicatorState('idle');
+              }, 3000);
+          }
+      } catch (error) {
+          console.error("TTS API Call Error:", error);
+          setAudioIndicatorState('error'); // Show error icon
+          setTimeout(() => { 
+            isSpeaking = false;
+            setAudioIndicatorState('idle');
+          }, 3000);
+      }
+  }
+  
+  /**
+   * Translates a user-input phrase from a source language back to English.
+   */
+  async function translateToEnglishSource(text, sourceLangCode) {
+    const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
+    const originalOutput = currentOutputText;
+
+    updateOutput(currentStrings.back_translating, true); 
+    elOutputText.style.fontSize = '16px';
+
+    const apiKey = "";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+    const userQuery = `Translate the ${langMeta(sourceLangCode).native} phrase: "${text}" into English. Only return the English translated phrase.`;
+
+    const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: {
+            parts: [{ text: "You are an expert translator. Your only task is to translate the provided phrase into English and return ONLY the resulting English phrase. Do not include any explanations, greetings, or commentary." }]
+        }
+    };
+
+    try {
+        const response = await exponentialBackoffFetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        const englishPhrase = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+        
+        if (englishPhrase) {
+            updateOutput(originalOutput); // Revert UI
+            elOutputText.style.fontSize = '20px';
+            return englishPhrase;
+        } else {
+            throw new Error("API returned no valid English translation.");
+        }
+    } catch (error) {
+        console.error("Back-Translation API Call Error:", error);
+        // Use localized error message
+        updateOutput(currentStrings.temp_error, true);
+        elOutputText.style.fontSize = '16px';
+        setTimeout(() => updateOutput(originalOutput), 3000); // Revert text
+        throw new Error("Translation failed."); // Re-throw to be caught by the caller
+    }
+  }
+
+
+  /**
+   * Performs the universal swap: updates the active list in all languages 
+   * based on the new English source phrase.
+   * @param {number} activeIndex - The index in the active phrase list being replaced.
+   * @param {string} newEnglishPhrase - The new English phrase (the universal source text).
+   */
+  async function performUniversalSwap(activeIndex, newEnglishPhrase) {
+      const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
+      
+      const originalOutput = currentOutputText;
+      updateOutput(currentStrings.translating, true); 
+      elOutputText.style.fontSize = '16px';
+
+      const apiKey = "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+      const targetLangs = LANGS.filter(l => l.code !== 'en').map(l => l.code);
+      const schemaProperties = targetLangs.reduce((acc, code) => {
+          acc[code] = { "type": "STRING", "description": `${langMeta(code).native} translation` };
+          return acc;
+      }, {});
+
+      const userQuery = `Translate the English phrase: "${newEnglishPhrase}" into all of these languages: ${targetLangs.join(', ')}.`;
+
+      const payload = {
+          contents: [{ parts: [{ text: userQuery }] }],
+          systemInstruction: {
+              parts: [{ text: "You are a highly accurate, expert translator. Your only task is to translate the provided English phrase into the specified languages and return the result strictly as a single JSON object conforming to the schema. Do not include any explanations, greetings, or commentary." }]
+          },
+          generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                  type: "OBJECT",
+                  properties: schemaProperties,
+                  required: targetLangs
+              }
+          }
+      };
+
+      try {
+          const response = await exponentialBackoffFetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+          });
+
+          const result = await response.json();
+          const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (jsonText) {
+              const translations = JSON.parse(jsonText);
+              
+              // --- CORE SWAP LOGIC ---
+              for (const lang of LANGS) {
+                  const langCode = lang.code;
+                  
+                  // 1. Identify the new phrase (translated or English source)
+                  const newPhrase = langCode === 'en' ? newEnglishPhrase : translations[langCode];
+
+                  if (newPhrase) {
+                      // 2. Update the active slot
+                      PHRASES_BANK[langCode][activeIndex] = newPhrase;
+                  }
+              }
+              // --- END CORE SWAP LOGIC ---
+
+              // 3. Update state and UI
+              lastPhraseIndex = activeIndex;
+              const newOutputText = getActivePhrases(outputLang)[activeIndex];
+              updateOutput(newOutputText);
+              elOutputText.style.fontSize = '20px';
+              renderAll();
+              saveState();
+
+          } else {
+              throw new Error("API returned no valid JSON text for translation.");
+          }
+
+      } catch (error) {
+          console.error("Translation API Call Error:", error);
+          
+          // Fallback logic for error: just revert the UI state
+          updateOutput(currentStrings.temp_error, true);
+          elOutputText.style.fontSize = '16px';
+          setTimeout(() => { 
+              updateOutput(originalOutput); // Revert to original output
+              elOutputText.style.fontSize = '20px';
+          }, 3000);
+      }
+  }
+
+
+  function renderLangRow(){
+    elLangRow.innerHTML = '';
+    
+    topRow.forEach((code, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'lang-btn';
+      // style
+      const meta = langMeta(code);
+      btn.style.background = meta.color;
+      btn.style.color = '#061215';
+      // label: show language name in current display language
+      const label = languages_display_names[displayLang] && languages_display_names[displayLang][code] ? languages_display_names[displayLang][code] : meta.native;
+      btn.innerHTML = '<span class="label">'+label+'</span>';
+      if (displayLang !== code) btn.classList.add('unselect');
+      
+      // Visually indicate the currently selected OUTPUT language (the one translating)
+      if (code === outputLang) {
+          btn.style.fontWeight = '900'; 
+      }
+
+      // Visually indicate the current DISPLAY language (the one defining the phrase bank text)
+      if (displayLang === code){
+        btn.classList.add('lang-selected');
+        // make glow color match language color
+        btn.style.color = '#fff';
+        btn.style.setProperty('outline-color',meta.color);
+        btn.style.setProperty('box-shadow',`0 8px 40px ${hexToRgba(meta.color,0.18)}`);
+        btn.style.setProperty('border','1px solid rgba(255,255,255,0.04)');
+        btn.style.setProperty('position','relative');
+        btn.style.setProperty('z-index','2');
+        btn.style.setProperty('color', '#fff'); // ensure text is white for contrast with colored glow
+      } else {
+         // Reset styles for unselected buttons to ensure clean look
+         btn.style.color = '#061215';
+         btn.style.setProperty('border','none');
+         btn.style.setProperty('box-shadow','none');
+      }
+
+      // accessibility
+      btn.setAttribute('data-lang', code);
+      btn.setAttribute('aria-label', `Language ${code}`);
+      
+      // events: click, dblclick, longpress
+      let pressTimer = null;
+      
+      const singleClickHandler = () => {
+        outputLang = code;
+        // get the phrase text based on the last clicked index in the newly selected output language
+        const idx = lastPhraseIndex || 0;
+        const text = getActivePhrases(outputLang)[idx] || getActivePhrases('en')[0];
+        updateOutput(text);
+        renderLangRow(); // Re-render to update output language highlight
+        saveState();
+      };
+
+      const doubleClickHandler = () => {
+        displayLang = code;
+        // when switching interface language, also reset output language and display the first phrase
+        outputLang = code;
+        lastPhraseIndex = 0;
+        updateOutput(getActivePhrases(displayLang)[0]);
+        renderAll();
+        saveState();
+      };
+
+      let lastClickTime = 0;
+      btn.addEventListener('click', (e) => {
+          const now = Date.now();
+          // Detect double click
+          if (now - lastClickTime < 300) {
+              lastClickTime = 0; // Reset
+              doubleClickHandler();
+          } else {
+              // Single click logic
+              lastClickTime = now;
+              // We need a slight delay to ensure it's not a double-click
+              setTimeout(() => {
+                  if (lastClickTime !== 0) {
+                      singleClickHandler();
+                      lastClickTime = 0;
+                  }
+              }, 300);
+          }
+      });
+
+      // Simple long press/context menu to swap language button position (if not 'en')
+      const longPressMs = 500;
+      const showSwapModal = (slotIndex) => {
+        showLangSwapModal(slotIndex);
+      };
+
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (idx === 0) return; 
+        showSwapModal(idx);
+      });
+
+      btn.addEventListener('touchstart', (e) => {
+        if (idx === 0) return;
+        pressTimer = setTimeout(() => {
+          showSwapModal(idx);
+          pressTimer = null;
+        }, longPressMs);
+      }, {passive:true});
+      
+      const clearPressTimer = () => { if (pressTimer) clearTimeout(pressTimer); pressTimer = null; };
+      btn.addEventListener('touchend', clearPressTimer, {passive:true});
+      btn.addEventListener('touchmove', clearPressTimer, {passive:true});
+      btn.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (idx === 0) return;
+        pressTimer = setTimeout(() => {
+          showSwapModal(idx);
+          pressTimer = null;
+        }, longPressMs);
+      });
+      btn.addEventListener('mouseup', clearPressTimer);
+      btn.addEventListener('mouseleave', clearPressTimer);
+
+      elLangRow.appendChild(btn);
+    });
+  }
+
+
+  function renderPhrases(){
+    elPhrases.innerHTML = '';
+    // Get the active phrase list for the current display language
+    const bank = getActivePhrases(displayLang); 
+
+    bank.forEach((ph, idx) => {
+      const b = document.createElement('button');
+      b.className = 'phrase-btn';
+      b.innerText = ph;
+
+      let lastClickTime = 0;
+      const DBL_CLICK_DELAY = 300;
+      const LONG_PRESS_DELAY = 800; // New: Duration for long press
+      let pressTimer = null; // New: Timer for long press
+
+      const singleClickHandler = () => {
+          lastPhraseIndex = idx;
+          
+          // Reset output to display language when a new phrase is clicked
+          if (outputLang !== displayLang) {
+              outputLang = displayLang;
+              renderLangRow(); 
+              saveState();
+          }
+
+          // show the phrase in the current output language (which is now reset to displayLang)
+          const outText = getActivePhrases(outputLang)[idx] || getActivePhrases(outputLang)[0];
+          updateOutput(outText);
+      };
+
+      // Unified function to show the custom input modal (for dblclick and long press)
+      const triggerEditModal = (e) => {
+        // Prevent default context menu on right-click/long-press
+        if (e) e.preventDefault(); 
+        if (pressTimer) clearTimeout(pressTimer);
+        pressTimer = null;
+        showCustomInputModal(idx);
+      };
+
+      // --- 1. Click/Double Click Handling ---
+      b.addEventListener('click', (e) => {
+          const now = Date.now();
+          // Detect double click
+          if (now - lastClickTime < DBL_CLICK_DELAY) {
+              lastClickTime = 0; 
+              triggerEditModal(e); // Double click triggers edit
+          } else {
+              // Single click logic setup
+              lastClickTime = now;
+              // We need a slight delay to ensure it's not a double-click
+              setTimeout(() => {
+                  // Only run single click logic if no double-click was detected later
+                  if (lastClickTime !== 0 && !pressTimer) { 
+                      singleClickHandler();
+                      lastClickTime = 0;
+                  }
+              }, DBL_CLICK_DELAY);
+          }
+      });
+      
+      // --- 2. Long Press Handling (Touch and Mouse Right-Click) ---
+      
+      // Start Timer on Touch/Mouse Down
+      const handlePressStart = (e) => {
+        // Clear previous timer
+        clearPressTimer(); 
+        
+        // Start a new timer only if a double-click hasn't just happened (to prevent overlap)
+        if (Date.now() - lastClickTime > DBL_CLICK_DELAY) {
+            pressTimer = setTimeout(() => {
+                triggerEditModal(e); // Long press triggers edit
+            }, LONG_PRESS_DELAY);
+        }
+      }
+      
+      // Helper to clear timer
+      const clearPressTimer = () => { 
+        if (pressTimer) clearTimeout(pressTimer); 
+        pressTimer = null; 
+      };
+
+      // Attach start events
+      b.addEventListener('touchstart', handlePressStart, {passive:false}); 
+      b.addEventListener('mousedown', handlePressStart);
+
+      // Attach end/cancel events
+      b.addEventListener('touchend', clearPressTimer, {passive:true});
+      b.addEventListener('touchmove', clearPressTimer, {passive:true});
+      b.addEventListener('mouseup', clearPressTimer);
+      b.addEventListener('mouseleave', clearPressTimer); // Important for desktop
+
+      // Context menu (Right-click) also triggers the edit modal immediately
+      b.addEventListener('contextmenu', triggerEditModal); 
+
+      elPhrases.appendChild(b);
+    });
+  }
+  
+  function closeModal(){
+    modalRoot.innerHTML = '';
+    modalRoot.style.display = 'none';
+  }
+
+  // --- Modal for Custom Phrase Input (Double Click / Long Press) ---
+  function showCustomInputModal(phraseIndex){
+    const langMetaDisplay = langMeta(displayLang);
+    const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
+    
+    // Customize strings based on the current display language
+    const langNativeName = langMetaDisplay.native;
+    const titleText = currentStrings.custom_input_title.replace('{lang_native}', langNativeName);
+    const labelText = currentStrings.custom_input_label.replace('{lang_native}', langNativeName);
+    
+    // Build Modal UI
+    modalRoot.innerHTML = '';
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    
+    const h = document.createElement('h3');
+    h.innerText = titleText;
+    modal.appendChild(h);
+
+    const label = document.createElement('label');
+    label.innerText = labelText;
+    label.className = 'block text-sm font-medium mb-1 text-muted';
+    modal.appendChild(label);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = `e.g., I need a room reservation`; // Generic English fallback placeholder
+    input.className = 'modal-input';
+    input.maxLength = 100;
+    // Set the current phrase as the default value
+    input.value = getActivePhrases(displayLang)[phraseIndex];
+    modal.appendChild(input);
+    input.focus();
+    input.select(); // Select the text for easy replacement
+
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'flex justify-between gap-2';
+
+    const cancel = document.createElement('button');
+    cancel.className = 'action-btn action-cancel';
+    cancel.innerText = currentStrings.cancel;
+    cancel.addEventListener('click', closeModal);
+    btnContainer.appendChild(cancel);
+    
+    const confirm = document.createElement('button');
+    confirm.className = 'action-btn action-confirm';
+    confirm.innerText = currentStrings.confirm;
+    confirm.addEventListener('click', async () => {
+        const userInput = input.value.trim();
+        if (!userInput) {
+            input.placeholder = 'Please enter a phrase!';
+            input.focus();
+            return;
+        }
+
+        closeModal();
+        let finalEnglishSourcePhrase = userInput; // Default if displayLang is 'en'
+
+        try {
+            if (displayLang !== 'en') {
+                // Step 1: Translate user input back to English to get the universal source phrase
+                finalEnglishSourcePhrase = await translateToEnglishSource(userInput, displayLang);
+            }
+            
+            // Step 2: Use the English source phrase to update all languages
+            performUniversalSwap(phraseIndex, finalEnglishSourcePhrase);
+
+        } catch (error) {
+            console.error("Custom phrase flow failed:", error);
+            // Error handled inside translateToEnglishSource or performUniversalSwap
+        }
+    });
+    btnContainer.appendChild(confirm);
+
+    modal.appendChild(btnContainer);
+    bg.appendChild(modal);
+    modalRoot.appendChild(bg);
+    modalRoot.style.display = 'block';
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            confirm.click();
+        }
+    });
+  }
+
+
+  // --- Language Swap Modal Logic (for long-press/right-click on language button) ---
+
+  function showLangSwapModal(slotIndex){
+    const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
+    
+    modalRoot.innerHTML = '';
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    const h = document.createElement('h3');
+    
+    const targetLangName = languages_display_names[displayLang] && languages_display_names[displayLang][topRow[slotIndex]] 
+                            ? languages_display_names[displayLang][topRow[slotIndex]] 
+                            : langMeta(topRow[slotIndex]).native;
+                            
+    h.innerText = currentStrings.replace_button_title.replace('{language}', targetLangName);
+    modal.appendChild(h);
+
+    const list = document.createElement('div');
+    list.className = 'lang-list flex flex-wrap gap-2 max-h-60 overflow-y-auto p-1';
+    
+    const allowed = LANGS.filter(l => l.code !== 'en' && (!topRow.includes(l.code) || topRow[slotIndex] === l.code));
+    
+    allowed.forEach(opt => {
+      const chip = document.createElement('div');
+      chip.className = 'px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 cursor-pointer text-sm font-semibold';
+      const label = languages_display_names[displayLang] && languages_display_names[displayLang][opt.code] ? languages_display_names[displayLang][opt.code] : opt.native;
+      chip.innerText = label + '  ('+opt.native+')';
+      chip.style.background = '#1b1c1e';
+      chip.addEventListener('click', () => {
+        const existingIndex = topRow.indexOf(opt.code);
+        if (existingIndex > -1 && existingIndex !== slotIndex){
+          const tmp = topRow[existingIndex];
+          topRow[existingIndex] = topRow[slotIndex];
+          topRow[slotIndex] = tmp;
+        } else {
+          topRow[slotIndex] = opt.code;
+        }
+        closeModal();
+        renderAll();
+        saveState();
+      });
+      list.appendChild(chip);
+    });
+    modal.appendChild(list);
+    const close = document.createElement('button');
+    close.className = 'close-btn action-cancel mt-4';
+    close.innerText = currentStrings.cancel;
+    close.addEventListener('click', closeModal);
+    modal.appendChild(close);
+
+    bg.appendChild(modal);
+    modalRoot.appendChild(bg);
+    modalRoot.style.display = 'block';
+  }
+
+  // --- Init and Event Attachments ---
+
+  // Attach the audio playback listener to the output area
+  elOutput.addEventListener('click', () => {
+      if (!isSpeaking) {
+          speakText(currentOutputText, outputLang);
+      }
+  });
+
+
+  function renderAll(){
+    renderLangRow();
+    renderPhrases();
+    
+    // --- Localize Help Text ---
+    const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
+    // Replace markdown bolding (**...**) with HTML bolding (<b>...</b>)
+    const localizedHelp = currentStrings.help_text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    elHelpText.innerHTML = localizedHelp;
+  }
+
+  // init render
+  updateOutput(getActivePhrases(outputLang)[lastPhraseIndex] || getActivePhrases('en')[0]);
+  renderAll();
+
+})();
+</script>
+</body>
+</html>
