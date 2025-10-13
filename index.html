@@ -68,7 +68,6 @@
   .lang-row{display:flex;gap:8px;margin-bottom:12px;}
   .lang-btn{flex:1;height:56px;border-radius:10px;border:none;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:0; position:relative;}
   .lang-btn:active{transform:translateY(1px)}
-  .lang-btn .label{pointer-events:none; text-shadow: 0 1px 2px rgba(0,0,0,0.2);}
   .lang-btn.unselect{opacity:0.85}
   .lang-selected{
     box-shadow:0 6px 30px rgba(100,150,255,0.18);
@@ -207,7 +206,7 @@
         replace_button_title: "Replace {language} button with...",
         loading_audio: "Loading Audio...",
         audio_error: "Audio Error: Failed to generate sound.",
-        api_error: "API Error. Please try again.",
+        api_error: "API Error. Please set the GEMINI_API_KEY environment variable in Vercel.",
         temp_loading: "Loading...", // Used for text area when processing non-audio translations
         temp_error: "Error!",
     },
@@ -222,7 +221,7 @@
         replace_button_title: "Reemplazar el botón de {language} por...",
         loading_audio: "Cargando Audio...",
         audio_error: "Error de audio: Falló la generación del sonido.",
-        api_error: "Error de API. Inténtalo de nuevo.",
+        api_error: "Error de API. Establece la variable de entorno GEMINI_API_KEY en Vercel.",
         temp_loading: "Cargando...",
         temp_error: "¡Error!",
     },
@@ -237,7 +236,7 @@
         replace_button_title: "Remplacer le bouton {language} par...",
         loading_audio: "Chargement Audio...",
         audio_error: "Erreur audio : Échec de la génération du son.",
-        api_error: "Erreur API. Veuillez réessayer.",
+        api_error: "Erreur API. Veuillez définir la variable d'environnement GEMINI_API_KEY dans Vercel.",
         temp_loading: "Chargement...",
         temp_error: "Erreur!",
     },
@@ -252,7 +251,7 @@
         replace_button_title: "Sostituisci il pulsante {language} con...",
         loading_audio: "Caricamento Audio...",
         audio_error: "Errore audio: Generazione del suono fallita.",
-        api_error: "Errore API. Riprova per favore.",
+        api_error: "Errore API. Imposta la variabile d'ambiente GEMINI_API_KEY in Vercel.",
         temp_loading: "Caricamento...",
         temp_error: "Errore!",
     },
@@ -267,7 +266,7 @@
         replace_button_title: "替换 {language} 按钮为...",
         loading_audio: "正在加载音频...",
         audio_error: "音频错误: 声音生成失败。",
-        api_error: "API 错误。请重试。",
+        api_error: "API 错误。请在 Vercel 中设置 GEMINI_API_KEY 环境变量。",
         temp_loading: "加载中...",
         temp_error: "错误!",
     },
@@ -282,7 +281,7 @@
         replace_button_title: "Заменить кнопку {language} на...",
         loading_audio: "Загрузка аудио...",
         audio_error: "Ошибка аудио: Не удалось сгенерировать звук.",
-        api_error: "Ошибка API. Повторите попытку.",
+        api_error: "Ошибка API. Установите переменную окружения GEMINI_API_KEY в Vercel.",
         temp_loading: "Загрузка...",
         temp_error: "Ошибка!",
     },
@@ -297,7 +296,7 @@
         replace_button_title: "استبدال زر {language} بـ...",
         loading_audio: "جاري تحميل الصوت...",
         audio_error: "خطأ في الصوت: فشل في توليد الصوت.",
-        api_error: "خطأ في API. يرجى المحاولة مرة أخرى.",
+        api_error: "خطأ في API. يرجى تعيين متغير البيئة GEMINI_API_KEY في Vercel.",
         temp_loading: "جاري التحميل...",
         temp_error: "خطأ!",
     },
@@ -312,7 +311,7 @@
         replace_button_title: "Substituir o botão {language} por...",
         loading_audio: "Carregando Áudio...",
         audio_error: "Erro de áudio: Falha ao gerar o som.",
-        api_error: "Erro de API. Por favor, tente novamente.",
+        api_error: "Erro de API. Por favor, defina a variável de ambiente GEMINI_API_KEY no Vercel.",
         temp_loading: "Carregando...",
         temp_error: "Erro!",
     },
@@ -327,7 +326,7 @@
         replace_button_title: "{language} बटन को इससे बदलें...",
         loading_audio: "ऑडियो लोड हो रहा है...",
         audio_error: "ऑडियो त्रुटि: ध्वनि उत्पन्न करने में विफल।",
-        api_error: "API त्रुटि। कृपया पुनः प्रयास करें।",
+        api_error: "API त्रुटि। कृपया Vercel में GEMINI_API_KEY पर्यावरण चर सेट करें।",
         temp_loading: "लोड हो रहा है...",
         temp_error: "त्रुटि!",
     },
@@ -342,7 +341,7 @@
         replace_button_title: "Replace {language} button with...",
         loading_audio: "音声ロード中...",
         audio_error: "音声エラー: 音声生成に失敗しました。",
-        api_error: "APIエラー。もう一度お試しください。",
+        api_error: "APIエラー。Vercelで環境変数GEMINI_API_KEYを設定してください。",
         temp_loading: "ロード中...",
         temp_error: "エラー!",
     }
@@ -427,6 +426,12 @@
   const elLoadingSpinner = document.getElementById('loadingSpinner');
   const elAudioIcon = document.getElementById('audioIcon');
   const elErrorIcon = document.getElementById('errorIcon');
+  
+  // Vercel Environment Variable Integration (CRITICAL LINE)
+  // Vercel injects environment variables into the global 'process.env' object.
+  const apiKey = typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY
+    ? process.env.GEMINI_API_KEY
+    : ""; 
 
   // Persistence Helper
   function saveState() {
@@ -451,9 +456,15 @@
 
   // Generic fetch with exponential backoff for API calls
   async function exponentialBackoffFetch(url, options, maxRetries = 5) {
+      if (!apiKey) {
+          throw new Error("API Key is missing. Cannot proceed with API call.");
+      }
       for (let i = 0; i < maxRetries; i++) {
           try {
-              const response = await fetch(url, options);
+              // Ensure the apiKey is appended correctly
+              const finalUrl = url.includes('?') ? `${url}&key=${apiKey}` : `${url}?key=${apiKey}`;
+              
+              const response = await fetch(finalUrl, options);
               if (response.ok) return response;
               
               if (response.status >= 500 || response.status === 429) {
@@ -558,10 +569,21 @@
       } else if (state === 'error') {
           elAudioIndicator.style.display = 'flex';
           elErrorIcon.style.display = 'block';
+      } else if (state === 'idle') {
+          // If state is idle, but there was a previous error, wait for the timeout to clear it
+          elAudioIndicator.style.display = 'none';
       }
   }
   
   async function speakText(text, langCode) {
+      const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
+      if (!apiKey) {
+          console.error("API Key is missing. Cannot perform TTS.");
+          updateOutput(currentStrings.api_error, true);
+          setTimeout(() => updateOutput(currentOutputText), 5000);
+          return;
+      }
+      
       if (isSpeaking) {
           console.warn("Speech generation already in progress.");
           return;
@@ -572,8 +594,7 @@
       setAudioIndicatorState('loading'); // Show loading spinner
       
       const voiceData = VOICE_MAP[langCode] || VOICE_MAP['en'];
-      const apiKey = ""; 
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`; // Key is added in fetch
 
       const payload = {
           contents: [{ parts: [{ text: text }] }],
@@ -640,14 +661,15 @@
    * Translates a user-input phrase from a source language back to English.
    */
   async function translateToEnglishSource(text, sourceLangCode) {
+    if (!apiKey) throw new Error("API Key is missing. Cannot perform translation.");
+    
     const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
     const originalOutput = currentOutputText;
 
     updateOutput(currentStrings.back_translating, true); 
     elOutputText.style.fontSize = '16px';
 
-    const apiKey = "";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`; // Key is added in fetch
 
     const userQuery = `Translate the ${langMeta(sourceLangCode).native} phrase: "${text}" into English. Only return the English translated phrase.`;
 
@@ -693,14 +715,15 @@
    * @param {string} newEnglishPhrase - The new English phrase (the universal source text).
    */
   async function performUniversalSwap(activeIndex, newEnglishPhrase) {
+      if (!apiKey) throw new Error("API Key is missing. Cannot perform universal swap.");
+      
       const currentStrings = UI_STRINGS[displayLang] || UI_STRINGS['en'];
       
       const originalOutput = currentOutputText;
       updateOutput(currentStrings.translating, true); 
       elOutputText.style.fontSize = '16px';
 
-      const apiKey = "";
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`; // Key is added in fetch
 
       const targetLangs = LANGS.filter(l => l.code !== 'en').map(l => l.code);
       const schemaProperties = targetLangs.reduce((acc, code) => {
@@ -1063,6 +1086,14 @@
         }
 
         closeModal();
+        
+        // --- API KEY CHECK ---
+        if (!apiKey) {
+            updateOutput(currentStrings.api_error, true);
+            setTimeout(() => updateOutput(currentOutputText), 5000);
+            return;
+        }
+        
         let finalEnglishSourcePhrase = userInput; // Default if displayLang is 'en'
 
         try {
